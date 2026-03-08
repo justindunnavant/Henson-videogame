@@ -1,0 +1,147 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: monospace;
+    overflow: hidden;
+}
+
+#game-container {
+    position: relative;
+    width: 512px;
+    height: 480px;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+#gameCanvas {
+    display: block;
+    background: #000;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.screen {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.92);
+    color: #fff;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40px;
+}
+
+.screen.active {
+    display: flex;
+}
+
+.screen h1 {
+    font-size: 28px;
+    color: #f0c040;
+    text-shadow: 2px 2px #804000;
+    margin-bottom: 20px;
+    line-height: 1.4;
+}
+
+.screen h2 {
+    font-size: 22px;
+    color: #f0c040;
+    margin-bottom: 16px;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #90c0f0;
+    margin-bottom: 40px;
+}
+
+.press-start {
+    font-size: 14px;
+    color: #f0c040;
+    animation: blink 1s step-end infinite;
+    margin-top: 30px;
+}
+
+.controls-hint {
+    font-size: 11px;
+    color: #888;
+    margin-top: 10px;
+}
+
+.screen p {
+    font-size: 14px;
+    line-height: 1.8;
+    max-width: 420px;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+#hud {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 48px;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-family: monospace;
+    font-size: 13px;
+    color: #fff;
+    border-bottom: 2px solid #444;
+    z-index: 5;
+}
+
+#hud-items {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.hud-item {
+    width: 28px;
+    height: 28px;
+    border: 1px solid #555;
+    background: #222;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    image-rendering: pixelated;
+}
+
+.hud-item.collected {
+    border-color: #f0c040;
+    background: #332800;
+}
+
+.hud-item canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
