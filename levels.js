@@ -336,11 +336,43 @@ const LEVEL2_ROOMS = {
             { x: 12, y: 4, type: 'supplies', message: 'Found SUPPLIES! Food and tools for the expedition.' },
             { x: 3, y: 8, type: 'sleddog', message: 'Found another sled dog! Your team is growing!' },
         ],
-        meteorite: { x: 10, y: 7 },
         npcs: [],
         music: 'arctic'
     }
 };
+
+// ============================================================
+// LEVEL 3: THE METEORITE SITE
+// Navigate the ice to reach the legendary Ahnighito meteorite
+// ============================================================
+
+const LEVEL3_ROOMS = {
+    meteorite_site: {
+        map: [
+            'KKKKKKKKKKKKKKKK',
+            'KKKKKKKKKKKKKKKK',
+            '......WW....WW..',
+            '...............,',
+            ',,..WWW......,,,',
+            ',,,..........,,.',
+            ',,......WW...,,.',
+            ',,.R.........,,,',
+            ',..........r.,,.',
+            '................',
+            ',,,,,,,,,,,,,,,,',
+            ',,,,,,,,,,,,,,,,',
+            'IIIIIIIIIIIIIIII',
+        ],
+        playerStart: { x: 1, y: 5 },
+        exits: [],
+        items: [],
+        meteorite: { x: 12, y: 5 },
+        npcs: [],
+        music: 'arctic'
+    }
+};
+
+const LEVEL3_REQUIRED = [];
 
 // ============================================================
 // STORY TEXT
@@ -385,6 +417,31 @@ const STORY_TEXTS = {
         "the legendary Ahnighito meteorite.",
         "",
         "The Inuit people will help guide the way..."
+    ],
+
+    level2_complete: {
+        title: "The Sled Team is Ready!",
+        text: [
+            "Matthew Henson has assembled his sled team!",
+            "",
+            "With three strong huskies, a sturdy sled,",
+            "harness, and supplies packed tight,",
+            "he is ready to race across the frozen tundra.",
+            "",
+            "The legendary Ahnighito meteorite awaits...",
+        ]
+    },
+
+    level3_intro: [
+        "The meteorite site...",
+        "",
+        "After a thrilling race across the ice,",
+        "Matthew Henson arrives at the final destination.",
+        "",
+        "The Inuit people told stories of a great",
+        "iron rock that fell from the sky.",
+        "",
+        "Navigate the ice to reach the Ahnighito meteorite!"
     ],
 
     victory: [

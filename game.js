@@ -110,7 +110,7 @@ function clearJustPressed() {
 // LEVEL / ROOM MANAGEMENT
 // ============================================================
 function loadRoom(roomId, playerX, playerY) {
-    const rooms = Game.level === 1 ? LEVEL1_ROOMS : LEVEL2_ROOMS;
+    const rooms = Game.level === 1 ? LEVEL1_ROOMS : (Game.level === 2 ? LEVEL2_ROOMS : LEVEL3_ROOMS);
     const room = rooms[roomId];
     if (!room) {
         console.error('Room not found:', roomId);
@@ -160,8 +160,10 @@ function startLevel(level) {
 
     if (level === 1) {
         loadRoom('main_deck');
-    } else {
+    } else if (level === 2) {
         loadRoom('base_camp');
+    } else if (level === 3) {
+        loadRoom('meteorite_site');
     }
 
     updateHUD();
@@ -179,7 +181,7 @@ function getTileAt(gridX, gridY) {
 
 function isSolid(gridX, gridY) {
     const tile = getTileAt(gridX, gridY);
-    const solidSet = Game.level === 1 ? SOLID_TILES_BOAT : SOLID_TILES_ARCTIC;
+    const solidSet = Game.level === 1 ? SOLID_TILES_BOAT : SOLID_TILES_ARCTIC; // L2 and L3 both use arctic
     return solidSet.has(tile);
 }
 
@@ -372,18 +374,12 @@ function checkInteraction() {
         }
     }
 
-    // Check meteorite in level 2
-    if (Game.level === 2 && Game.roomData.meteorite) {
+    // Check meteorite in level 3
+    if (Game.level === 3 && Game.roomData && Game.roomData.meteorite) {
         const met = Game.roomData.meteorite;
         const dist = Math.abs(px - met.x) + Math.abs(py - met.y);
         if (dist <= 2) {
-            // Check if player has all required items
-            const hasAll = checkLevel2Complete();
-            if (hasAll) {
-                showVictory();
-            } else {
-                showMessage("The meteorite is here! But you need all your gear and dogs first.");
-            }
+            showVictory();
         }
     }
 }
@@ -430,6 +426,16 @@ function checkLevelComplete() {
                 document.getElementById('level-complete-text').textContent = STORY_TEXTS.level1_complete.text.join('\n');
             }, 1500);
         }
+    } else if (Game.level === 2) {
+        const hasAll = checkLevel2Complete();
+        if (hasAll) {
+            setTimeout(() => {
+                Game.state = 'level_complete';
+                showScreen('level-complete-screen');
+                document.getElementById('level-complete-title').textContent = STORY_TEXTS.level2_complete.title;
+                document.getElementById('level-complete-text').textContent = STORY_TEXTS.level2_complete.text.join('\n');
+            }, 1500);
+        }
     }
 }
 
@@ -474,14 +480,15 @@ function updateTransition() {
 function updateHUD() {
     const levelNames = {
         1: 'Level 1: The Ship',
-        2: 'Level 2: The Arctic'
+        2: 'Level 2: The Arctic',
+        3: 'Level 3: The Meteorite'
     };
     document.getElementById('hud-level').textContent = levelNames[Game.level] || '';
 
     const hudItems = document.getElementById('hud-items');
     hudItems.innerHTML = '';
 
-    const required = Game.level === 1 ? LEVEL1_REQUIRED : LEVEL2_REQUIRED;
+    const required = Game.level === 1 ? LEVEL1_REQUIRED : (Game.level === 2 ? LEVEL2_REQUIRED : LEVEL3_REQUIRED);
 
     required.forEach(itemType => {
         const div = document.createElement('div');
@@ -556,6 +563,12 @@ function render() {
         return; // Overlays handle these states
     }
 
+    // Cutscene renders its own content
+    if (Game.state === 'cutscene') {
+        renderCutscene();
+        return;
+    }
+
     // Offset for HUD
     ctxMain.save();
     ctxMain.translate(0, HUD_H);
@@ -569,8 +582,8 @@ function render() {
     // Draw NPCs
     renderNPCs();
 
-    // Draw meteorite (Level 2)
-    if (Game.level === 2 && Game.roomData && Game.roomData.meteorite) {
+    // Draw meteorite (Level 3)
+    if (Game.level === 3 && Game.roomData && Game.roomData.meteorite) {
         renderMeteorite();
     }
 
@@ -599,7 +612,7 @@ function render() {
 function renderTiles() {
     if (!Game.roomData || !Game.roomData.map) return;
 
-    const tileLookup = Game.level === 1 ? TILE_LOOKUP_BOAT : TILE_LOOKUP_ARCTIC;
+    const tileLookup = Game.level === 1 ? TILE_LOOKUP_BOAT : TILE_LOOKUP_ARCTIC; // L2 and L3 both use arctic
 
     for (let row = 0; row < ROWS; row++) {
         const line = Game.roomData.map[row];
@@ -770,6 +783,368 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 // ============================================================
+// CUTSCENE - Sled Dog Race across the Arctic
+// ============================================================
+const Cutscene = {
+    frame: 0,
+    duration: 300, // 5 seconds at 60fps
+    scrollX: 0,
+    // Terrain features (rocks, ice chunks) that scroll past
+    terrain: [],
+    // Snow particles
+    snowParticles: [],
+};
+
+function startCutscene() {
+    Game.state = 'cutscene';
+    Cutscene.frame = 0;
+    Cutscene.scrollX = 0;
+
+    // Generate random terrain features
+    Cutscene.terrain = [];
+    for (let i = 0; i < 20; i++) {
+        Cutscene.terrain.push({
+            x: 200 + i * 120 + Math.random() * 80,
+            type: Math.random() > 0.5 ? 'rock' : 'ice',
+            size: 8 + Math.random() * 16,
+            y: 300 + Math.random() * 60,
+        });
+    }
+
+    // Generate snow particles
+    Cutscene.snowParticles = [];
+    for (let i = 0; i < 60; i++) {
+        Cutscene.snowParticles.push({
+            x: Math.random() * CANVAS_W,
+            y: Math.random() * CANVAS_H,
+            speed: 1 + Math.random() * 2,
+            size: 1 + Math.random() * 2,
+        });
+    }
+}
+
+function updateCutscene() {
+    Cutscene.frame++;
+    Cutscene.scrollX += 3;
+
+    // Update snow particles
+    for (const p of Cutscene.snowParticles) {
+        p.x -= p.speed * 2;
+        p.y += p.speed * 0.5;
+        if (p.x < -10) p.x = CANVAS_W + 10;
+        if (p.y > CANVAS_H) { p.y = -5; p.x = Math.random() * CANVAS_W; }
+    }
+
+    // Auto-advance after duration
+    if (Cutscene.frame >= Cutscene.duration) {
+        // Transition to Level 3
+        hideAllScreens();
+        Game.level = 3;
+        Game.state = 'story';
+        Game.storyLines = STORY_TEXTS.level3_intro;
+        document.getElementById('story-text').textContent = Game.storyLines.join('\n');
+        showScreen('story-screen');
+        Game.currentRoom = null;
+        startLevel(3);
+    }
+}
+
+function renderCutscene() {
+    const f = Cutscene.frame;
+    const progress = f / Cutscene.duration;
+
+    // --- Fade in/out ---
+    let fadeAlpha = 1;
+    if (f < 30) fadeAlpha = f / 30;
+    if (f > Cutscene.duration - 40) fadeAlpha = (Cutscene.duration - f) / 40;
+
+    // --- Sky with aurora ---
+    // Dark arctic sky
+    const skyGrad = ctxMain.createLinearGradient(0, 0, 0, 260);
+    skyGrad.addColorStop(0, '#0a0a2e');
+    skyGrad.addColorStop(0.4, '#1a1a4e');
+    skyGrad.addColorStop(1, '#2a3a5e');
+    ctxMain.fillStyle = skyGrad;
+    ctxMain.fillRect(0, 0, CANVAS_W, 260);
+
+    // Aurora borealis effect
+    ctxMain.globalAlpha = 0.3 * fadeAlpha;
+    for (let i = 0; i < 5; i++) {
+        const auroraY = 40 + i * 20 + Math.sin(f * 0.02 + i) * 15;
+        const auroraGrad = ctxMain.createLinearGradient(0, auroraY, 0, auroraY + 30);
+        const hue = (120 + i * 20 + f * 0.5) % 360;
+        auroraGrad.addColorStop(0, `hsla(${hue}, 80%, 60%, 0)`);
+        auroraGrad.addColorStop(0.5, `hsla(${hue}, 80%, 60%, 0.4)`);
+        auroraGrad.addColorStop(1, `hsla(${hue}, 80%, 60%, 0)`);
+        ctxMain.fillStyle = auroraGrad;
+        ctxMain.fillRect(0, auroraY, CANVAS_W, 30);
+    }
+    ctxMain.globalAlpha = 1;
+
+    // Stars
+    ctxMain.fillStyle = '#ffffff';
+    for (let i = 0; i < 30; i++) {
+        const sx = (i * 97 + 13) % CANVAS_W;
+        const sy = (i * 53 + 7) % 200;
+        const twinkle = Math.sin(f * 0.1 + i) > 0.3 ? 1 : 0.4;
+        ctxMain.globalAlpha = twinkle * fadeAlpha;
+        ctxMain.fillRect(sx, sy, 2, 2);
+    }
+    ctxMain.globalAlpha = 1;
+
+    // --- Ground / Snow ---
+    const groundY = 280;
+    // Snow ground gradient
+    const groundGrad = ctxMain.createLinearGradient(0, groundY, 0, CANVAS_H);
+    groundGrad.addColorStop(0, '#c8d8e8');
+    groundGrad.addColorStop(0.3, '#b0c8d8');
+    groundGrad.addColorStop(1, '#90a8b8');
+    ctxMain.fillStyle = groundGrad;
+    ctxMain.fillRect(0, groundY, CANVAS_W, CANVAS_H - groundY);
+
+    // Snow texture lines
+    ctxMain.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctxMain.lineWidth = 1;
+    for (let i = 0; i < 15; i++) {
+        const ly = groundY + 10 + i * 14;
+        const lx = -(Cutscene.scrollX * (0.5 + i * 0.05)) % 80;
+        ctxMain.beginPath();
+        for (let x = lx; x < CANVAS_W + 40; x += 40 + i * 3) {
+            ctxMain.moveTo(x, ly);
+            ctxMain.lineTo(x + 15 + i * 2, ly);
+        }
+        ctxMain.stroke();
+    }
+
+    // --- Terrain features scrolling past ---
+    for (const t of Cutscene.terrain) {
+        const tx = t.x - Cutscene.scrollX * 0.8;
+        if (tx < -50 || tx > CANVAS_W + 50) continue;
+
+        ctxMain.globalAlpha = fadeAlpha;
+        if (t.type === 'rock') {
+            ctxMain.fillStyle = '#707888';
+            ctxMain.beginPath();
+            ctxMain.moveTo(tx, t.y);
+            ctxMain.lineTo(tx + t.size, t.y);
+            ctxMain.lineTo(tx + t.size * 0.7, t.y - t.size * 0.8);
+            ctxMain.lineTo(tx + t.size * 0.2, t.y - t.size * 0.6);
+            ctxMain.closePath();
+            ctxMain.fill();
+            // Snow cap
+            ctxMain.fillStyle = '#e0e8f0';
+            ctxMain.beginPath();
+            ctxMain.moveTo(tx + t.size * 0.15, t.y - t.size * 0.55);
+            ctxMain.lineTo(tx + t.size * 0.75, t.y - t.size * 0.75);
+            ctxMain.lineTo(tx + t.size * 0.5, t.y - t.size * 0.9);
+            ctxMain.closePath();
+            ctxMain.fill();
+        } else {
+            // Ice chunk
+            ctxMain.fillStyle = '#a0d0e8';
+            ctxMain.fillRect(tx, t.y - t.size * 0.5, t.size, t.size * 0.5);
+            ctxMain.fillStyle = '#c0e8f8';
+            ctxMain.fillRect(tx + 2, t.y - t.size * 0.5 + 2, t.size - 4, t.size * 0.2);
+        }
+    }
+    ctxMain.globalAlpha = 1;
+
+    // --- Meteorite glow on horizon (appears near end) ---
+    if (progress > 0.5) {
+        const glowProgress = (progress - 0.5) / 0.5;
+        const glowX = CANVAS_W - 60;
+        const glowY = groundY - 20;
+        const glowRadius = 20 + glowProgress * 40;
+        ctxMain.globalAlpha = glowProgress * 0.6 * fadeAlpha;
+        const glowGrad = ctxMain.createRadialGradient(glowX, glowY, 0, glowX, glowY, glowRadius);
+        glowGrad.addColorStop(0, 'rgba(255, 160, 60, 0.8)');
+        glowGrad.addColorStop(0.5, 'rgba(255, 120, 40, 0.4)');
+        glowGrad.addColorStop(1, 'rgba(255, 80, 20, 0)');
+        ctxMain.fillStyle = glowGrad;
+        ctxMain.beginPath();
+        ctxMain.arc(glowX, glowY, glowRadius, 0, Math.PI * 2);
+        ctxMain.fill();
+        ctxMain.globalAlpha = 1;
+    }
+
+    // --- Sled dogs (3 dogs running) ---
+    const dogBaseX = 100;
+    const dogBaseY = groundY - 30;
+    const runCycle = Math.floor(f / 4) % 4; // fast run animation
+
+    for (let d = 0; d < 3; d++) {
+        const dx = dogBaseX + d * 40;
+        const dy = dogBaseY + Math.sin(f * 0.3 + d * 1.5) * 2; // slight bounce
+
+        ctxMain.globalAlpha = fadeAlpha;
+        drawCutsceneDog(dx, dy, runCycle, d);
+    }
+
+    // --- Harness lines from dogs to sled ---
+    const sledX = dogBaseX + 3 * 40 + 20;
+    const sledY = groundY - 26;
+    ctxMain.strokeStyle = '#806030';
+    ctxMain.lineWidth = 2;
+    ctxMain.globalAlpha = fadeAlpha;
+    for (let d = 0; d < 3; d++) {
+        const dx = dogBaseX + d * 40 + 20;
+        const dy = dogBaseY + Math.sin(f * 0.3 + d * 1.5) * 2 + 10;
+        ctxMain.beginPath();
+        ctxMain.moveTo(dx, dy);
+        ctxMain.lineTo(sledX, sledY + 12);
+        ctxMain.stroke();
+    }
+
+    // --- Sled ---
+    drawCutsceneSled(sledX, sledY);
+
+    // --- Henson on sled ---
+    const hensonX = sledX + 8;
+    const hensonY = sledY - 20;
+    drawCutsceneHenson(hensonX, hensonY);
+    ctxMain.globalAlpha = 1;
+
+    // --- Snow particles ---
+    ctxMain.fillStyle = '#ffffff';
+    for (const p of Cutscene.snowParticles) {
+        ctxMain.globalAlpha = 0.7 * fadeAlpha;
+        ctxMain.fillRect(p.x, p.y, p.size, p.size);
+    }
+    ctxMain.globalAlpha = 1;
+
+    // --- Text overlay ---
+    if (f > 30 && f < Cutscene.duration - 50) {
+        let textAlpha = 1;
+        if (f < 60) textAlpha = (f - 30) / 30;
+        if (f > Cutscene.duration - 80) textAlpha = (Cutscene.duration - 50 - f) / 30;
+        textAlpha = Math.max(0, Math.min(1, textAlpha));
+
+        ctxMain.globalAlpha = textAlpha * fadeAlpha;
+        ctxMain.fillStyle = '#f0c040';
+        ctxMain.font = 'bold 18px monospace';
+        ctxMain.textAlign = 'center';
+        ctxMain.fillText('Racing across the Arctic...', CANVAS_W / 2, 460);
+        ctxMain.textAlign = 'left';
+        ctxMain.globalAlpha = 1;
+    }
+
+    // --- Full-screen fade overlay ---
+    if (fadeAlpha < 1) {
+        ctxMain.fillStyle = `rgba(0,0,0,${1 - fadeAlpha})`;
+        ctxMain.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    }
+}
+
+function drawCutsceneDog(x, y, runCycle, index) {
+    // Simple side-view sled dog
+    const colors = ['#e0e0e0', '#c0c0c0', '#d0d0d0']; // slightly different shades
+    const bodyColor = colors[index % 3];
+
+    // Body
+    ctxMain.fillStyle = bodyColor;
+    ctxMain.fillRect(x + 4, y + 4, 16, 10);
+
+    // Head
+    ctxMain.fillRect(x, y + 2, 8, 8);
+
+    // Ear
+    ctxMain.fillStyle = '#a0a0a0';
+    ctxMain.fillRect(x + 1, y, 3, 4);
+
+    // Eye
+    ctxMain.fillStyle = '#000';
+    ctxMain.fillRect(x + 2, y + 4, 2, 2);
+
+    // Legs - animated run cycle
+    ctxMain.fillStyle = bodyColor;
+    const legOffsets = [
+        [{ fx: 6, fy: 14, bx: 16, by: 14 },  // frame 0
+         { fx: 4, fy: 16, bx: 18, by: 12 }],  // back pair
+        [{ fx: 8, fy: 16, bx: 14, by: 12 },
+         { fx: 6, fy: 12, bx: 16, by: 16 }],
+        [{ fx: 10, fy: 14, bx: 12, by: 14 },
+         { fx: 8, fy: 16, bx: 14, by: 12 }],
+        [{ fx: 4, fy: 12, bx: 18, by: 16 },
+         { fx: 6, fy: 16, bx: 16, by: 12 }],
+    ];
+    const legs = legOffsets[runCycle % 4];
+    // Front legs
+    ctxMain.fillRect(x + legs[0].fx, y + legs[0].fy, 3, 8);
+    ctxMain.fillRect(x + legs[1].fx, y + legs[1].fy, 3, 8);
+    // Back legs
+    ctxMain.fillRect(x + legs[0].bx, y + legs[0].by, 3, 8);
+    ctxMain.fillRect(x + legs[1].bx, y + legs[1].by, 3, 8);
+
+    // Tail
+    ctxMain.fillRect(x + 20, y + 2 + Math.sin(Game.globalFrame * 0.4 + index) * 2, 3, 4);
+}
+
+function drawCutsceneSled(x, y) {
+    // Side-view sled
+    // Runners (bottom)
+    ctxMain.fillStyle = '#604020';
+    ctxMain.fillRect(x - 4, y + 22, 40, 3);
+    ctxMain.fillRect(x - 8, y + 24, 4, 2); // front curl
+
+    // Sled bed
+    ctxMain.fillStyle = '#907050';
+    ctxMain.fillRect(x, y + 8, 32, 14);
+
+    // Sled sides
+    ctxMain.fillStyle = '#806040';
+    ctxMain.fillRect(x, y + 6, 32, 3);
+
+    // Supplies on sled
+    ctxMain.fillStyle = '#505880';
+    ctxMain.fillRect(x + 2, y + 2, 12, 8);
+    ctxMain.fillStyle = '#608040';
+    ctxMain.fillRect(x + 14, y + 4, 8, 6);
+
+    // Upright supports
+    ctxMain.fillStyle = '#604020';
+    ctxMain.fillRect(x + 28, y, 3, 22);
+    ctxMain.fillRect(x - 2, y + 4, 3, 18);
+}
+
+function drawCutsceneHenson(x, y) {
+    // Side-view Henson standing on sled
+    // Parka body
+    ctxMain.fillStyle = '#2060a0';
+    ctxMain.fillRect(x + 4, y + 8, 14, 16);
+
+    // Parka hood
+    ctxMain.fillStyle = '#185080';
+    ctxMain.fillRect(x + 4, y + 2, 14, 8);
+
+    // Fur trim on hood
+    ctxMain.fillStyle = '#c0a080';
+    ctxMain.fillRect(x + 4, y + 8, 14, 2);
+
+    // Face
+    ctxMain.fillStyle = '#8B6914';
+    ctxMain.fillRect(x + 6, y + 4, 8, 6);
+
+    // Eye
+    ctxMain.fillStyle = '#000';
+    ctxMain.fillRect(x + 7, y + 5, 2, 2);
+
+    // Arms holding sled
+    ctxMain.fillStyle = '#2060a0';
+    ctxMain.fillRect(x + 2, y + 12, 4, 8);
+    ctxMain.fillRect(x + 16, y + 12, 4, 8);
+
+    // Gloves
+    ctxMain.fillStyle = '#604020';
+    ctxMain.fillRect(x + 1, y + 18, 4, 4);
+    ctxMain.fillRect(x + 16, y + 18, 4, 4);
+
+    // Legs/boots
+    ctxMain.fillStyle = '#403020';
+    ctxMain.fillRect(x + 6, y + 24, 5, 6);
+    ctxMain.fillRect(x + 12, y + 24, 5, 6);
+}
+
+// ============================================================
 // UPDATE LOOP
 // ============================================================
 function update() {
@@ -791,9 +1166,11 @@ function update() {
         case 'story':
             if (isPressed('Enter')) {
                 hideAllScreens();
-                if (Game.level === 0 || Game.currentRoom === null) {
+                if (Game.level === 0) {
                     Game.level = 1;
                     startLevel(1);
+                } else if (Game.currentRoom === null) {
+                    startLevel(Game.level);
                 }
                 Game.state = 'playing';
             }
@@ -822,16 +1199,24 @@ function update() {
         case 'level_complete':
             if (isPressed('Enter')) {
                 hideAllScreens();
-                Game.level = 2;
-                Game.state = 'story';
-                Game.storyLines = STORY_TEXTS.level2_intro;
-                document.getElementById('story-text').textContent = Game.storyLines.join('\n');
-                showScreen('story-screen');
-
-                // When story finishes, start level 2
-                Game.currentRoom = null;
-                startLevel(2);
+                if (Game.level === 1) {
+                    // L1 complete → L2 story → L2 playing
+                    Game.level = 2;
+                    Game.state = 'story';
+                    Game.storyLines = STORY_TEXTS.level2_intro;
+                    document.getElementById('story-text').textContent = Game.storyLines.join('\n');
+                    showScreen('story-screen');
+                    Game.currentRoom = null;
+                    startLevel(2);
+                } else if (Game.level === 2) {
+                    // L2 complete → cutscene
+                    startCutscene();
+                }
             }
+            break;
+
+        case 'cutscene':
+            updateCutscene();
             break;
 
         case 'win':
