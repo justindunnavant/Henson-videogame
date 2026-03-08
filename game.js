@@ -75,6 +75,7 @@ const Game = {
     transitioning: false,
     transitionAlpha: 0,
     transitionCallback: null,
+    transitionCooldown: 0,
 };
 
 // ============================================================
@@ -118,6 +119,7 @@ function loadRoom(roomId, playerX, playerY) {
 
     Game.currentRoom = roomId;
     Game.roomData = room;
+    Game.transitionCooldown = 30; // ignore door/exit checks for 30 frames after room load
 
     // Set player position
     const startX = playerX !== undefined ? playerX : room.playerStart.x;
@@ -221,6 +223,8 @@ function checkNPCCollision(px, py) {
 function updatePlayer() {
     if (Game.state !== 'playing' || Game.transitioning) return;
 
+    if (Game.transitionCooldown > 0) Game.transitionCooldown--;
+
     let dx = 0, dy = 0;
     let newDir = Game.player.dir;
     let moving = false;
@@ -314,6 +318,8 @@ function checkItemPickup() {
 // DOOR/EXIT TRANSITIONS
 // ============================================================
 function checkTransitions() {
+    if (Game.transitionCooldown > 0) return;
+
     const px = Game.player.tileX;
     const py = Game.player.tileY;
 
@@ -441,33 +447,24 @@ function showVictory() {
 }
 
 // ============================================================
-// TRANSITIONS
+// TRANSITIONS - instant room swap with brief flash
 // ============================================================
 function doTransition(callback) {
     if (Game.transitioning) return;
     Game.transitioning = true;
-    Game.transitionAlpha = 0;
-    Game.transitionCallback = callback;
+    Game.transitionAlpha = 1;
+    if (callback) callback();
+    // Brief flash then fade back in
+    Game.transitionCallback = null;
 }
 
 function updateTransition() {
     if (!Game.transitioning) return;
 
-    if (Game.transitionAlpha < 1) {
-        Game.transitionAlpha += 0.08;
-        if (Game.transitionAlpha >= 1) {
-            Game.transitionAlpha = 1;
-            if (Game.transitionCallback) {
-                Game.transitionCallback();
-                Game.transitionCallback = null;
-            }
-        }
-    } else {
-        Game.transitionAlpha -= 0.08;
-        if (Game.transitionAlpha <= 0) {
-            Game.transitionAlpha = 0;
-            Game.transitioning = false;
-        }
+    Game.transitionAlpha -= 0.12;
+    if (Game.transitionAlpha <= 0) {
+        Game.transitionAlpha = 0;
+        Game.transitioning = false;
     }
 }
 
@@ -857,18 +854,12 @@ function update() {
 // ============================================================
 // GAME LOOP
 // ============================================================
-function gameLoop(timestamp) {
-    if (!Game.lastTime) Game.lastTime = timestamp;
-    const delta = timestamp - Game.lastTime;
+let _loopId = null;
 
-    // Target ~60fps
-    if (delta >= 16) {
-        Game.lastTime = timestamp;
-        update();
-        render();
-    }
-
-    requestAnimationFrame(gameLoop);
+function gameLoop() {
+    update();
+    render();
+    _loopId = requestAnimationFrame(gameLoop);
 }
 
 // ============================================================
@@ -880,10 +871,12 @@ function init() {
     // Show title screen
     Game.state = 'title';
     Game.level = 0;
+    Game.lastTime = 0;
     showScreen('title-screen');
 
-    // Start game loop
-    requestAnimationFrame(gameLoop);
+    // Cancel any existing game loop and start fresh
+    if (_loopId) cancelAnimationFrame(_loopId);
+    _loopId = requestAnimationFrame(gameLoop);
 }
 
 // Start when page loads
